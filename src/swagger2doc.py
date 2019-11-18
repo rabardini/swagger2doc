@@ -233,6 +233,7 @@ class CreateWordDoc(object):
         self.sensor_switch = False
         self.schema_switch = False
         self.schemaWT_switch = False
+        self.cloud_switch = False
         self.derived_name = None
         self.title = None
 
@@ -365,6 +366,7 @@ class CreateWordDoc(object):
         # create the lead in referencint text
         reference_para = self.document.add_paragraph('<Table Reference Here> defines the CRUDN operations that are supported on the "')
         reference_para.add_run(resource_type+"\" Resource Type.")
+        reference_para.style = 'PARAGRAPH'
 
         # create the caption
         paragraph = self.document.add_paragraph('Table ', style='Caption')
@@ -555,6 +557,7 @@ class CreateWordDoc(object):
         # create the lead in referencint text
         reference_para = self.document.add_paragraph('<Table Reference Here> defines the Properties that are part of the \"')
         reference_para.add_run(resource_name+"\" Resource Type.")
+        reference_para.style = 'PARAGRAPH'
 
         # create the caption
         paragraph = self.document.add_paragraph('Table ', style='Caption')
@@ -608,6 +611,7 @@ class CreateWordDoc(object):
         # create the lead in referencint text
         reference_para = self.document.add_paragraph('<Table Reference Here> provides the detailed per Property mapping for \"')
         reference_para.add_run(select_resource+"\".")
+        reference_para.style = 'PARAGRAPH'
 
         # create the caption
         paragraph = self.document.add_paragraph('Table ', style='Caption')
@@ -615,7 +619,7 @@ class CreateWordDoc(object):
             Table_annex (paragraph)
         else:
             Table (paragraph)
-        paragraph.add_run(" – The property mapping for "+select_resource+".")
+        paragraph.add_run(' – The Property mapping for "'+select_resource+'".')
         paragraph.style = 'TABLE-title'
         # create the table
         self.tableAttribute = self.document.add_table(rows=1, cols=4)
@@ -637,6 +641,7 @@ class CreateWordDoc(object):
         # create the lead in referencint text
         reference_para = self.document.add_paragraph('<Table Reference Here> provides the details of the Properties that are part of \"')
         reference_para.add_run(select_resource+"\".")
+        reference_para.style = 'PARAGRAPH'
 
         # create the caption
         paragraph = self.document.add_paragraph('Table ', style='Caption')
@@ -644,7 +649,7 @@ class CreateWordDoc(object):
             Table_annex (paragraph)
         else:
             Table (paragraph)
-        paragraph.add_run(" – The properties of "+select_resource+".")
+        paragraph.add_run(' – The Properties of "'+select_resource+'".')
         paragraph.style = 'TABLE-title'
         # create the table
         self.tableAttribute = self.document.add_table(rows=1, cols=4)
@@ -692,6 +697,17 @@ class CreateWordDoc(object):
         value = find_key_link(value1, target2)
         return value
 
+    def get_value_by_full_path_name(self, parse_tree, path_name, target):
+        """
+        retrieve the target key below the path_name
+        :param parse_tree: tree to search from
+        :param path_name: url name (with the /)
+        :param target: key to find after path_name
+        :return:
+        """
+        json_path_dict = find_key_link(parse_tree, path_name)
+        value = find_key_link(json_path_dict, target)
+        return value
 
     def generate_sections(self, parse_tree, resource_name):
         """
@@ -734,6 +750,7 @@ class CreateWordDoc(object):
                 par.style = 'ANNEX-heading2'
             par_text = self.document.add_paragraph(new_text)
             par_text.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            par_text.style = 'PARAGRAPH'
             #self.document.add_paragraph(value)
 
         # section URI
@@ -750,7 +767,8 @@ class CreateWordDoc(object):
                 par = self.document.add_heading('Well-known URI', level=3)
             if self.annex_switch is True:
                 par.style = 'ANNEX-heading2'
-            self.document.add_paragraph("/"+str(url_without_query))
+            paragraph = self.document.add_paragraph("/"+str(url_without_query))
+            paragraph.style = 'PARAGRAPH'
 
         # section RT
         if resource_name is not None:
@@ -763,7 +781,8 @@ class CreateWordDoc(object):
                 for char in "[]'":
                     rt_name_str = rt_name_str.replace(char,'')
                 text = 'The Resource Type is defined as: "' + rt_name_str + '".'
-                self.document.add_paragraph(text)
+                paragraph = self.document.add_paragraph(text)
+                paragraph.style = 'PARAGRAPH'
             else:
                 print ("RT not found!")
         else:
@@ -777,7 +796,8 @@ class CreateWordDoc(object):
                 if def_name is not None:
                     text = 'The derived model: "' + str(def_name) + '".'
                     description_text = def_data.get('description', "")
-                    self.document.add_paragraph(text + description_text)
+                    paragraph = self.document.add_paragraph(text + description_text)
+                    paragraph.style = 'PARAGRAPH'
             par = self.document.add_heading('Property definition', level=3)
             for def_name, def_data in parse_tree["definitions"].items():
                 print ("derived model name (table):",def_name)
@@ -894,6 +914,53 @@ class CreateWordDoc(object):
                 except:
                     pass
 
+    def generate_sections_cloud(self, parse_tree):
+        """
+        generate the individual sections
+        :param parse_tree:
+        """
+        try:
+            title_name = parse_tree["info"]["title"]
+        except:
+            title_name = find_key_link(parse_tree, 'title')
+        print ("Title:", title_name)
+        self.title = title_name
+        par = self.document.add_heading(title_name, level=2)
+        if self.annex_switch is True:
+            par.style = 'ANNEX-heading1'
+
+        par = self.document.add_heading('Supported APIs', level=3)
+        if self.annex_switch is True:
+            par.style = 'ANNEX-heading2'
+
+        # Get the paths supportedenumeration
+        path_list = find_key_link(parse_tree, 'paths')
+        for path, path_obj in path_list.items():
+            print ("Path found: ", path)
+            par = self.document.add_heading(path, level=4)
+            if self.annex_switch is True:
+                par.style = 'ANNEX-heading3'
+            description_value = self.get_value_by_full_path_name(parse_tree, path, "description")
+            new_text = self.swag_unsanitize_description(description_value)
+            if new_text != "":
+                # add text
+                par_text = self.document.add_paragraph(new_text)
+                par_text.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                par_text.style = 'PARAGRAPH'
+
+        par = self.document.add_heading('OpenAPI 2.0 definition', level=3)
+        if self.annex_switch is True:
+            par.style = 'ANNEX-heading2'
+
+        object_string = open(args.swagger, 'r').read()
+        sanitized_text = self.swag_unsanitize_description(object_string)
+        #object_string = json.dumps(parse_tree, sort_keys=True, indent=2, separators=(',', ': '))
+        try:
+            par = self.document.add_paragraph(sanitized_text, style='CODE-BLACK')
+            par.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        except:
+            pass
+
     def convert(self):
         """
         conversion of the swagger data into the word document
@@ -907,7 +974,12 @@ class CreateWordDoc(object):
             print ("make sure that docx file exist..")
             return
 
-        self.generate_sections(self.json_parse_tree, self.resource_name)
+        #self.generate_sections(self.json_parse_tree, self.resource_name)
+        if self.cloud_switch is True:
+            self.generate_sections_cloud(self.json_parse_tree)
+        else:
+            self.generate_sections(self.json_parse_tree, self.resource_name)
+
         if self.docx_name_out is not None:
             self.document.save(self.docx_name_out)
             print ("document saved..", self.docx_name_out)
@@ -939,6 +1011,7 @@ parser.add_argument( "-schemadir"  , "--schemadir"  , default=".",
 parser.add_argument('-derived', '--derived', default=None, help='derived data model specificaton (--derived XXX) e.g. XXX Property Name in table use "." to ignore the property name setting')
 parser.add_argument('-annex', '--annex', help='uses a annex heading instead of normal heading (--annex true)')
 parser.add_argument('-wellknown', '--wellknown', help='uses the prefix of welknown url (--wellknown true)')
+parser.add_argument('-cloud', '--cloud', help='uses the cloud api formating (--cloud true)')
 
 args = parser.parse_args()
 
@@ -952,6 +1025,7 @@ print("word_out    : " + str(args.word_out))
 print("derived     : " + str(args.derived))
 print("annex       : " + str(args.annex))
 print("wellknown   : " + str(args.wellknown))
+print("cloud       : " + str(args.cloud))
 print("")
 
 try:
@@ -975,8 +1049,15 @@ try:
     else:
         wellknown_switch = True
 
+    cloud_switch = args.cloud
+    if cloud_switch is None:
+        cloud_switch = False
+    else:
+        cloud_switch = True
+
     worddoc.annex_switch = annex_switch
     worddoc.wellknown_switch = wellknown_switch
+    worddoc.cloud_switch = cloud_switch
 
     worddoc.derived_name = args.derived
     if worddoc.derived_name in ["."]:
